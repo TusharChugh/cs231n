@@ -607,23 +607,68 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
         old information is discarded completely at every time step, while
         momentum=1 means that new information is never incorporated. The
         default of momentum=0.9 should work well in most situations.
-      - running_mean: Array of shape (D,) giving running mean of features
-      - running_var Array of shape (D,) giving running variance of features
+      - running_mean: Array of shape (C,) giving running mean of features
+      - running_var Array of shape (C,) giving running variance of features
 
     Returns a tuple of:
     - out: Output data, of shape (N, C, H, W)
     - cache: Values needed for the backward pass
     """
-    out, cache = None, None
+    N, C, H, W = x.shape
+    x = np.swapaxes(x, 0, 1)
+    out,cache = batchnorm_forward(x.reshape(C, N * H * W).T, gamma, beta, bn_param)
+    out = out.T.reshape(C, N, H, W).swapaxes(0,1)
+#     gamma = gamma[np.newaxis, :, np.newaxis, np.newaxis]
+#     beta = beta[np.newaxis, :, np.newaxis, np.newaxis]
+#     out, cache = batchnorm_forward(np.mean(x, axis=(2,3)), gamma, beta, bn_param)
+#     print(bn_param['running_mean'] )
+#     mode = bn_param['mode']
+#     eps = bn_param.get('eps', 1e-5)
+#     momentum = bn_param.get('momentum', 0.9)
 
-    ###########################################################################
-    # TODO: Implement the forward pass for spatial batch normalization.       #
-    #                                                                         #
-    # HINT: You can implement spatial batch normalization using the vanilla   #
-    # version of batch normalization defined above. Your implementation should#
-    # be very short; ours is less than five lines.                            #
-    ###########################################################################
-    pass
+#     N, C, H, W = x.shape
+#     running_mean = bn_param.get('running_mean', np.zeros(C, dtype=x.dtype))
+#     running_var = bn_param.get('running_var', np.zeros(C, dtype=x.dtype))
+    
+#     out, cache = None, None
+
+#     ###########################################################################
+#     # TODO: Implement the forward pass for spatial batch normalization.       #
+#     #                                                                         #
+#     # HINT: You can implement spatial batch normalization using the vanilla   #
+#     # version of batch normalization defined above. Your implementation should#
+#     # be very short; ours is less than five lines.                            #
+#     ###########################################################################
+#     if mode == 'train':
+#         sample_mean = np.mean(x, axis = (0, 2, 3))
+#         zerocentered_mean = x - sample_mean[np.newaxis, :, np.newaxis, np.newaxis]
+#         sample_var = np.mean(zerocentered_mean**2, axis = (0, 2, 3))
+#         sample_std = np.sqrt(sample_var[np.newaxis, :, np.newaxis, np.newaxis] + eps)
+#         inverse_std = np.reciprocal(sample_std)
+#         normalized_x = (zerocentered_mean) * inverse_std # normalize
+
+#         out = gamma[np.newaxis, :, np.newaxis, np.newaxis] * \
+#               normalized_x + beta[np.newaxis, :, np.newaxis, np.newaxis] # scale and shift
+
+#         #calculate running mean and average
+#         running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+#         running_var = momentum * running_var + (1 - momentum) * sample_var
+
+#         #store in cache for the backward path
+#         cache = (zerocentered_mean, sample_var, sample_std, inverse_std, normalized_x, gamma, eps)
+    
+#     elif mode == 'test':
+#         normalized_x = (x - running_mean[np.newaxis, :, np.newaxis, np.newaxis]) / \
+#                         np.sqrt(running_var[np.newaxis, :, np.newaxis, np.newaxis] + eps)
+#         out = gamma[np.newaxis, :, np.newaxis, np.newaxis] * \
+#               normalized_x + beta[np.newaxis, :, np.newaxis, np.newaxis] # scale and shift
+    
+#     else:
+#         raise ValueError('Invalid forward batchnorm mode "%s"' % mode)
+
+    # Store the updated running means back into bn_param
+#     bn_param['running_mean'] = running_mean
+#     bn_param['running_var'] = running_var
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -644,7 +689,7 @@ def spatial_batchnorm_backward(dout, cache):
     - dgamma: Gradient with respect to scale parameter, of shape (C,)
     - dbeta: Gradient with respect to shift parameter, of shape (C,)
     """
-    dx, dgamma, dbeta = None, None, None
+    N, C, H, W = dout.shape
 
     ###########################################################################
     # TODO: Implement the backward pass for spatial batch normalization.      #
@@ -653,7 +698,8 @@ def spatial_batchnorm_backward(dout, cache):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout.swapaxes(0,1).reshape(C, N * H * W).T, cache)
+    dx = dx.T.reshape(C, N, H, W).swapaxes(0,1)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
