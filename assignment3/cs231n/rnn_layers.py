@@ -34,7 +34,8 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+    next_h = np.tanh(x.dot(Wx) + prev_h.dot(Wh) + b)
+    cache = (x, prev_h, Wx, Wh, next_h)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -57,13 +58,20 @@ def rnn_step_backward(dnext_h, cache):
     - db: Gradients of bias vector, of shape (H,)
     """
     dx, dprev_h, dWx, dWh, db = None, None, None, None, None
+    x, prev_h, Wx, Wh, next_h = cache
     ##############################################################################
     # TODO: Implement the backward pass for a single step of a vanilla RNN.      #
     #                                                                            #
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
     ##############################################################################
-    pass
+    dtanh = (1.0 - next_h**2) * dnext_h
+    db = np.sum(dtanh, axis=0)
+    dx = np.dot(dtanh, Wx.T)
+    dWx = np.dot(x.T, dtanh)
+    
+    dprev_h = np.dot(dtanh, Wh.T)
+    dWh = np.dot(prev_h.T, dtanh)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -88,13 +96,25 @@ def rnn_forward(x, h0, Wx, Wh, b):
     - h: Hidden states for the entire timeseries, of shape (N, T, H).
     - cache: Values needed in the backward pass
     """
-    h, cache = None, None
+    N, T, D = x.shape
+    _, H = h0.shape
+    h = np.zeros((T, N, H))
+    prev_h = h0
+    cache = []
+    #(Optional) swapping axis can be helpful to speedup by minimizing cache misses
+    x = x.swapaxes(0,1) 
     ##############################################################################
     # TODO: Implement forward pass for a vanilla RNN running on a sequence of    #
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    for t in range(T):
+        #Weights getting multiplied at every step, Can explode!!!
+        prev_h, cache_t = rnn_step_forward(x[t,:, :], prev_h, Wx, Wh, b)
+        h[t,:,:] = prev_h
+        cache.append(cache_t)
+    
+    h = h.swapaxes(0,1)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -115,13 +135,27 @@ def rnn_backward(dh, cache):
     - dWh: Gradient of hidden-to-hidden weights, of shape (H, H)
     - db: Gradient of biases, of shape (H,)
     """
-    dx, dh0, dWx, dWh, db = None, None, None, None, None
+    N, T, H = dh.shape
+    _, D = cache[0][0].shape #Get dimension from the x stored on cache
+    dx = np.zeros((T,N,D))
+    dWx, db = np.zeros((D, H)), np.zeros(H)
+    dWh = np.zeros((H,H))
+    dprev_h = np.zeros((N,H))
+    dh = dh.swapaxes(0,1)
     ##############################################################################
     # TODO: Implement the backward pass for a vanilla RNN running an entire      #
     # sequence of data. You should use the rnn_step_backward function that you   #
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
-    pass
+    for t in range(T-1, -1, -1):
+        dh_t = dh[t,:,:] + dprev_h
+        dx[t, :, :], dprev_h, dWx_t, dWh_t, db_t = rnn_step_backward(dh_t, cache[t])
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+       
+    dh0 = dprev_h
+    dx = dx.swapaxes(0,1)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -149,7 +183,8 @@ def word_embedding_forward(x, W):
     #                                                                            #
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
-    pass
+    out = W[x]
+    cache = x, W
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -171,14 +206,16 @@ def word_embedding_backward(dout, cache):
     Returns:
     - dW: Gradient of word embedding matrix, of shape (V, D).
     """
-    dW = None
+    x, W = cache
+    dW = np.zeros(W.shape)
     ##############################################################################
     # TODO: Implement the backward pass for word embeddings.                     #
     #                                                                            #
     # Note that Words can appear more than once in a sequence.                   #
-    # HINT: Look up the function np.add.at                                       #
+    # HINT: Look up the function np.add.at        
+    # https://stackoverflow.com/questions/45473896/np-add-at-indexing-with-array
     ##############################################################################
-    pass
+    np.add.at(dW, x, dout)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
